@@ -54,7 +54,7 @@ function initApp() {
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js').catch((error) => {
+    navigator.serviceWorker.register('/service-worker.js').catch((error) => {
       console.warn('Service worker registration failed', error);
     });
   }

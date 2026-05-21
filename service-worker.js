@@ -1,4 +1,5 @@
-const CACHE_NAME = 'rentpro-pwa-v1';
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `rentpro-pwa-${CACHE_VERSION}`;
 const ASSETS = [
   '/',
   '/index.html',
@@ -7,26 +8,22 @@ const ASSETS = [
   '/manifest.json',
   '/favicon.svg',
   '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
-  'https://cdn.jsdelivr.net/npm/chart.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js',
-  'https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js'
+  '/icons/icon-512.svg'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
       keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-    ))).then(() => self.clients.claim())
+    )).then(() => self.clients.claim())
   );
 });
 
@@ -41,19 +38,29 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request)
         .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type === 'opaque') {
+          if (!networkResponse || networkResponse.status !== 200) {
             return networkResponse;
           }
+
           const clonedResponse = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clonedResponse));
           return networkResponse;
         })
         .catch(() => {
-          if (event.request.mode === 'navigate') {
+          if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
             return caches.match('/index.html');
           }
-          return null;
+          if (event.request.destination === 'image') {
+            return caches.match('/favicon.svg');
+          }
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
         });
     })
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
