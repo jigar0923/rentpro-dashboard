@@ -1,0 +1,29 @@
+// Firestore security rules for RentPro landlord dashboard
+// Only authenticated users can read/write their own tenant data
+// Prevent any unauthenticated or cross-user access.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User-specific tenant collection.
+    match /users/{userId}/tenants/{tenantId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Protect any other documents under the user record.
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Deny all other access globally.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// Deployment instructions:
+// 1. Save this file as firestore.rules in your project root.
+// 2. Deploy using the Firebase CLI:
+//      firebase deploy --only firestore:rules
+// 3. Or copy/paste the rules into the Firebase Console Firestore rules editor.

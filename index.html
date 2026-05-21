@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RentPro Landlord Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="loading-screen hidden" id="loadingScreen">
+    <div class="spinner"></div>
+    <p>Loading RentPro...</p>
+  </div>
+
+  <div class="auth-loader hidden" id="authLoader">
+    <div class="spinner"></div>
+    <p>Checking authentication…</p>
+  </div>
+
+  <div class="login-screen hidden" id="loginScreen">
+    <div class="login-card glass-card">
+      <div class="brand">RentPro</div>
+      <h2>Admin Login</h2>
+      <p class="login-subtitle">Secure landlord dashboard access.</p>
+      <input type="email" id="loginUser" placeholder="Email address" autocomplete="username" />
+      <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password" />
+      <button class="primary-btn" onclick="login()">Login</button>
+      <button class="secondary-btn social-btn" onclick="loginWithGoogle()">Continue with Google</button>
+      <div class="login-hint">Use your landlord account to access your private dashboard.</div>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="appShell">
+    <aside class="sidebar">
+      <div class="logo">RentPro</div>
+      <nav>
+        <button class="nav-link active" data-section="dashboard">Dashboard</button>
+        <button class="nav-link" data-section="tenants">Tenants</button>
+        <button class="nav-link" data-section="analytics">Analytics</button>
+        <button class="nav-link" data-section="settings">Settings</button>
+      </nav>
+      <div class="sidebar-footer">
+        <p>Landlord Suite</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="skeleton-overlay hidden" id="skeletonOverlay">
+        <div class="skeleton-blocks">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-table"></div>
+        </div>
+      </div>
+      <header class="topbar">
+        <div>
+          <h1>Landlord Management</h1>
+          <p class="subtitle">Professional rent tracking, payment history, and tenant management.</p>
+        </div>
+
+        <div class="top-actions">
+          <button class="icon-btn" onclick="toggleTheme()" id="themeToggle">?? Dark</button>
+          <span id="firebaseStatus" class="firebase-status disconnected">Offline</span>
+          <button class="secondary-btn" onclick="exportCSV()">Export CSV</button>
+          <button class="secondary-btn" onclick="downloadBackup()">Backup</button>
+          <button class="secondary-btn" onclick="document.getElementById('restoreFile').click()">Restore</button>
+          <button class="secondary-btn" onclick="logout()">Logout</button>
+          <input type="file" id="restoreFile" accept="application/json" hidden onchange="restoreBackup(event)" />
+        </div>
+      </header>
+
+      <section class="quick-cards" id="dashboardSection">
+        <div class="stat-card glass-card">
+          <p>Total Tenants</p>
+          <h2 id="totalTenants">0</h2>
+        </div>
+        <div class="stat-card glass-card">
+          <p>Total Collection</p>
+          <h2 id="totalCollection">?0</h2>
+        </div>
+        <div class="stat-card glass-card warning-card">
+          <p>Overdue Alerts</p>
+          <h2 id="overdueCount">0</h2>
+        </div>
+        <div class="stat-card glass-card">
+          <p>Current Month Rent</p>
+          <h2 id="monthCollection">?0</h2>
+        </div>
+      </section>
+
+      <section class="analytics-grid" id="analyticsSection">
+        <div class="chart-card glass-card">
+          <div class="card-head"><h3>Paid vs Unpaid</h3></div>
+          <canvas id="statusChart" height="220"></canvas>
+        </div>
+        <div class="chart-card glass-card">
+          <div class="card-head"><h3>Monthly Income</h3></div>
+          <canvas id="monthlyChart" height="220"></canvas>
+        </div>
+        <div class="summary-card glass-card">
+          <h3>Current Month Summary</h3>
+          <div class="summary-list">
+            <div><span>Collected</span><strong id="currentMonthCollected">?0</strong></div>
+            <div><span>Pending</span><strong id="currentMonthPending">?0</strong></div>
+            <div><span>Electricity</span><strong id="currentMonthElectricity">?0</strong></div>
+            <div><span>Active Tenants</span><strong id="activeTenants">0</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-grid" id="tenantsSection">
+        <div class="panel glass-card">
+          <div class="panel-header">
+            <div>
+              <h2 id="formTitle">Add Tenant</h2>
+              <p>Use this form to manage tenant records and payments.</p>
+            </div>
+            <button class="secondary-btn" onclick="resetForm()">Clear</button>
+          </div>
+
+          <div class="form-grid">
+            <input type="text" id="name" placeholder="Tenant Name" />
+            <input type="text" id="room" placeholder="Room Number" />
+            <input type="tel" id="phone" placeholder="Phone Number" />
+            <input type="number" id="rent" placeholder="Monthly Rent" />
+            <input type="number" id="electricity" placeholder="Electricity Bill" />
+            <input type="date" id="date" />
+            <button class="primary-btn large-btn" onclick="submitTenant()" id="saveButton">Add Tenant</button>
+          </div>
+        </div>
+
+        <div class="panel glass-card">
+          <div class="panel-header">
+            <div>
+              <h2>Tenant Ledger</h2>
+              <p>Search, edit, view profiles and manage payments.</p>
+            </div>
+            <div class="search-box inside">
+              <input type="text" id="search" placeholder="Search tenant, room, phone..." oninput="searchTenant()" />
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Room</th>
+                  <th>Rent</th>
+                  <th>Electricity</th>
+                  <th>Total</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="tenantList"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel glass-card" id="settingsSection">
+        <div class="panel-header">
+          <div>
+            <h2>Settings</h2>
+            <p>Theme controls, data sync options, and dashboard preferences.</p>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h3>Theme Mode</h3>
+            <p>Switch between dark and light modes to match your workspace.</p>
+            <button class="secondary-btn" onclick="toggleTheme()">Toggle Theme</button>
+          </div>
+          <div class="settings-card">
+            <h3>Cloud Sync</h3>
+            <p>Firebase Firestore support is available when configured in <code>script.js</code>.</p>
+            <p class="hint">Set <code>useFirestore</code> to true and add your Firebase configuration.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal hidden" id="tenantModal">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Tenant Profile</h3>
+        <button class="icon-btn" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="tenantModalBody"></div>
+      <div class="modal-actions">
+        <button class="secondary-btn" onclick="generateReceipt()">Download Receipt</button>
+        <button class="primary-btn" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
