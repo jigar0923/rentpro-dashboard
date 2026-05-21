@@ -35,12 +35,87 @@ const saveButton = document.getElementById('saveButton');
 const searchInput = document.getElementById('search');
 const authLoader = document.getElementById('authLoader');
 const skeletonOverlay = document.getElementById('skeletonOverlay');
+const installButton = document.getElementById('installBtn');
+const offlineBanner = document.getElementById('offlineBanner');
+const userMenuButton = document.getElementById('userMenuButton');
+const userDropdown = document.getElementById('userDropdown');
+const formModal = document.getElementById('tenantFormModal');
+let deferredInstallPrompt = null;
 
 function initApp() {
   attachNav();
   applyTheme(state.settings.theme);
   showAuthLoader(true);
+  registerServiceWorker();
+  setupPWA();
+  updateNetworkStatus();
   initFirebase();
+}
+
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').catch((error) => {
+      console.warn('Service worker registration failed', error);
+    });
+  }
+}
+
+function setupPWA() {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    showInstallButton(true);
+    showToast('Install RentPro for a faster app experience', 'info');
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    showInstallButton(false);
+    showToast('RentPro installed successfully', 'success');
+  });
+
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+
+  window.addEventListener('click', (event) => {
+    if (!event.target.closest('.user-menu-container')) {
+      userDropdown?.classList.add('hidden');
+    }
+  });
+}
+
+function showInstallButton(show) {
+  if (!installButton) return;
+  installButton.classList.toggle('hidden', !show);
+}
+
+async function promptInstall() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  if (choice.outcome === 'accepted') {
+    showToast('Installation accepted. Open RentPro from your home screen.', 'success');
+  } else {
+    showToast('Install dismissed. You can install later from the browser menu.', 'info');
+  }
+  deferredInstallPrompt = null;
+  showInstallButton(false);
+}
+
+function updateNetworkStatus() {
+  if (!offlineBanner) return;
+  const offline = !navigator.onLine;
+  offlineBanner.classList.toggle('hidden', !offline);
+}
+
+function updateUserMenu(user) {
+  if (!userMenuButton) return;
+  userMenuButton.textContent = user.displayName || user.email || 'Landlord';
+}
+
+function toggleUserMenu() {
+  if (!userDropdown) return;
+  userDropdown.classList.toggle('hidden');
 }
 
 function getStorageKey() {
@@ -132,6 +207,7 @@ async function handleUserSignedIn(user) {
     name: user.displayName || ''
   };
 
+  updateUserMenu(user);
   loadState();
   saveState();
   showApp();
@@ -150,6 +226,8 @@ function handleUserSignedOut() {
   renderBoard();
   showLogin();
   updateFirebaseStatus('disconnected', 'Offline');
+  showInstallButton(false);
+  updateUserMenu({ email: 'Guest' });
   showSkeleton(false);
 }
 
@@ -284,15 +362,28 @@ async function restoreBackupToFirestore(tenants) {
 }
 
 function attachNav() {
-  document.querySelectorAll('.nav-link').forEach((button) => {
+  const navButtons = document.querySelectorAll('.nav-link, .bottom-nav-btn');
+  navButtons.forEach((button) => {
     button.addEventListener('click', () => {
-      document.querySelectorAll('.nav-link').forEach((nav) => nav.classList.remove('active'));
+      navButtons.forEach((nav) => nav.classList.remove('active'));
       button.classList.add('active');
       const target = button.dataset.section;
       const section = document.getElementById(`${target}Section`);
       section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+}
+
+function openAddTenantModal() {
+  editingTenantId = null;
+  formTitle.textContent = 'Add Tenant';
+  saveButton.textContent = 'Add Tenant';
+  resetForm();
+  formModal?.classList.remove('hidden');
+}
+
+function closeFormModal() {
+  formModal?.classList.add('hidden');
 }
 
 function showLogin() {
@@ -503,6 +594,7 @@ function submitTenant() {
   } else {
     addTenant(tenantData);
   }
+  closeFormModal();
 }
 
 function addTenant(data) {
@@ -558,6 +650,7 @@ function startEdit(id) {
   document.getElementById('rent').value = tenant.rent;
   document.getElementById('electricity').value = tenant.electricity;
   document.getElementById('date').value = tenant.date;
+  formModal?.classList.remove('hidden');
   showToast('Editing tenant details', 'info');
 }
 
@@ -853,6 +946,8 @@ window.deleteTenant = deleteTenant;
 window.startEdit = startEdit;
 window.viewProfile = viewProfile;
 window.closeModal = closeModal;
+window.openAddTenantModal = openAddTenantModal;
+window.closeFormModal = closeFormModal;
 window.generateReceipt = generateReceipt;
 window.exportCSV = exportCSV;
 window.downloadBackup = downloadBackup;
